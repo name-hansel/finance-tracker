@@ -103,7 +103,7 @@
   th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--border-muted);}
   th{font-weight:600;color:var(--text-muted);font-size:12px;text-transform:uppercase;letter-spacing:.02em;border-bottom:2px solid var(--border);}
   tbody tr:hover{background:var(--bg);}
-  tbody tr.date-group-start td{border-top:2px solid var(--border);}
+  tbody tr.date-group-start td{border-top:2px solid var(--border) !important;}
   td.num{text-align:right;font-family:var(--mono);}
 
   .badge{display:inline-block;padding:2px 8px;border-radius:2em;font-size:12px;font-weight:600;}
@@ -873,6 +873,8 @@ function renderEntryTable(){
     ? `${sorted.length} entries`
     : `${sorted.length} of ${month.entries.length} entries`;
 
+  const isDateSort = entrySort === 'date-desc' || entrySort === 'date-asc';
+
   tbody.innerHTML = sorted.map((e,idx)=>{
     const tag = getTag(e.tagId);
     let acctLabel;
@@ -887,7 +889,10 @@ function renderEntryTable(){
       badgeClass = e.type==='incoming' ? 'badge-in' : 'badge-out';
       badgeText = e.type==='incoming' ? 'Incoming' : 'Outgoing';
     }
-    const isNewDateGroup = sortField==='date' && idx>0 && sorted[idx-1].date!==e.date;
+    // Date grouping is enabled explicitly for both date sort directions.
+    // Compare the sorted rows themselves so filtering and either date direction
+    // always produce the correct group boundaries.
+    const isNewDateGroup = isDateSort && idx > 0 && sorted[idx - 1].date !== e.date;
     return `
       <tr${isNewDateGroup ? ' class="date-group-start"' : ''}>
         <td>${fmtEntryDate(e.date)}</td>
