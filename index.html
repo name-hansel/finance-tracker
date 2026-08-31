@@ -66,6 +66,10 @@
 
   .grid{display:grid;gap:16px;}
   .grid-2{grid-template-columns:1fr 1fr;}
+  .entries-layout{grid-template-columns:1.3fr .7fr;}
+  .entry-type-date-row{grid-template-columns:minmax(120px,.65fr) minmax(310px,1.35fr);}
+  .entry-type-date-row .field{min-width:0;}
+  .date-nav{min-width:0;}
   .entry-form-card{height:fit-content;}
   .grid-3{grid-template-columns:1fr 1fr 1fr;}
   .grid-4{grid-template-columns:repeat(4,1fr);}
@@ -80,6 +84,7 @@
   .field{margin-bottom:12px;}
   .field-row{display:flex;gap:10px;}
   .field-row > .field{flex:1;}
+  .entry-type-date-row > .field:first-child{flex:0 0 120px;}
   .input-currency{position:relative;}
   .input-currency::before{
     content:"₹";position:absolute;left:10px;top:50%;transform:translateY(-50%);
@@ -163,7 +168,16 @@
   #entriesCard.fullscreen #entryTableWrap{flex:1;max-height:none;}
   .fullscreen-backdrop{position:fixed;inset:0;background:rgba(27,31,36,.35);z-index:39;}
 
-    .comment-cell {
+    .date-nav{display:flex;align-items:center;gap:4px;}
+  .date-nav input{flex:1;min-width:0;}
+  .date-nav-btn{width:28px;height:28px;padding:0;display:inline-flex;align-items:center;justify-content:center;
+    border:1px solid var(--border);background:var(--panel);border-radius:var(--radius);
+    color:var(--text-muted);cursor:pointer;font-size:14px;line-height:1;}
+  .date-nav-btn:hover:not(:disabled){background:var(--bg);color:var(--text);}
+  .date-nav-btn:disabled{opacity:.4;cursor:not-allowed;}
+  .date-nav-today{font-size:12px;}
+
+  .comment-cell {
       max-width: 220px;
       overflow: hidden;
       text-overflow: ellipsis;
@@ -213,12 +227,12 @@
 
     <div id="monthContent" style="display:none;">
       <h2 id="monthHeading" style="margin:0 0 16px 0;"></h2>
-      <div class="grid grid-2">
+      <div class="grid grid-2 entries-layout">
         <div class="card entry-form-card">
           <h2 id="entryFormTitle">Add Entry</h2>
           <form id="entryForm">
             <input type="hidden" id="entryId">
-            <div class="field-row">
+            <div class="field-row entry-type-date-row">
               <div class="field">
                 <label>Type</label>
                 <select id="entryType">
@@ -229,7 +243,12 @@
               </div>
               <div class="field">
                 <label>Date</label>
-                <input type="date" id="entryDate">
+                <div class="date-nav">
+                  <button type="button" class="date-nav-btn" id="btnPrevDate" title="Previous date" aria-label="Previous date">‹</button>
+                  <input type="date" id="entryDate">
+                  <button type="button" class="date-nav-btn" id="btnNextDate" title="Next date" aria-label="Next date">›</button>
+                  <button type="button" class="date-nav-btn date-nav-today" id="btnTodayDate" title="Go to today" aria-label="Go to today">●</button>
+                </div>
               </div>
             </div>
 
@@ -694,6 +713,18 @@ function populateTagSelect(){
   if([...filterTag.options].some(o=>o.value===prevTag)) filterTag.value = prevTag;
 }
 
+document.getElementById('entryDate').addEventListener('change', updateDateNavButtons);
+document.getElementById('btnPrevDate').addEventListener('click', ()=>shiftEntryDate(-1));
+document.getElementById('btnNextDate').addEventListener('click', ()=>shiftEntryDate(1));
+document.getElementById('btnTodayDate').addEventListener('click', ()=>{
+  const dateInput = document.getElementById('entryDate');
+  const today = getLocalDateString();
+  if(today >= dateInput.min && today <= dateInput.max){
+    dateInput.value = today;
+    updateDateNavButtons();
+  }
+});
+
 document.getElementById('entryType').addEventListener('change', ()=>{
   const type = document.getElementById('entryType').value;
   document.getElementById('singleAccountField').style.display = type==='transfer' ? 'none' : 'block';
@@ -734,6 +765,39 @@ function applyFullscreenState(){
   }
 }
 
+function getLocalDateString(date=new Date()){
+  const year = date.getFullYear();
+  const month = String(date.getMonth()+1).padStart(2,'0');
+  const day = String(date.getDate()).padStart(2,'0');
+  return `${year}-${month}-${day}`;
+}
+
+function updateDateNavButtons(){
+  const dateInput = document.getElementById('entryDate');
+  const prevBtn = document.getElementById('btnPrevDate');
+  const nextBtn = document.getElementById('btnNextDate');
+  const todayBtn = document.getElementById('btnTodayDate');
+  if(!dateInput || !prevBtn || !nextBtn || !todayBtn) return;
+
+  prevBtn.disabled = !dateInput.value || dateInput.value <= dateInput.min;
+  nextBtn.disabled = !dateInput.value || dateInput.value >= dateInput.max;
+  const today = getLocalDateString();
+  todayBtn.disabled = today < dateInput.min || today > dateInput.max;
+}
+
+function shiftEntryDate(days){
+  const dateInput = document.getElementById('entryDate');
+  if(!dateInput || !dateInput.value) return;
+  const [year, month, day] = dateInput.value.split('-').map(Number);
+  const date = new Date(year, month-1, day);
+  date.setDate(date.getDate()+days);
+  const nextDate = getLocalDateString(date);
+  if(nextDate >= dateInput.min && nextDate <= dateInput.max){
+    dateInput.value = nextDate;
+    updateDateNavButtons();
+  }
+}
+
 function setEntryDateBounds(){
   const month = getMonth(currentMonthId);
   const dateInput = document.getElementById('entryDate');
@@ -745,9 +809,10 @@ function setEntryDateBounds(){
   dateInput.min = firstDate;
   dateInput.max = lastDate;
   if(!dateInput.value || dateInput.value < firstDate || dateInput.value > lastDate){
-    const today = new Date().toISOString().slice(0,10);
+    const today = getLocalDateString();
     dateInput.value = today >= firstDate && today <= lastDate ? today : firstDate;
   }
+  updateDateNavButtons();
 }
 
 function resetEntryForm(keepValues=false){
@@ -761,7 +826,7 @@ function resetEntryForm(keepValues=false){
   document.getElementById('entryForm').reset();
   document.getElementById('entryType').value = type;
   document.getElementById('entryType').dispatchEvent(new Event('change'));
-  document.getElementById('entryDate').value = date || new Date().toISOString().slice(0,10);
+  document.getElementById('entryDate').value = date || getLocalDateString();
 
   if(keepValues){
     if(type==='transfer'){
