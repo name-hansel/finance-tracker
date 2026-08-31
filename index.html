@@ -893,9 +893,10 @@ function renderEntryTable(){
     // Compare the sorted rows themselves so filtering and either date direction
     // always produce the correct group boundaries.
     const isNewDateGroup = isDateSort && idx > 0 && sorted[idx - 1].date !== e.date;
+    const showDate = !isDateSort || idx === 0 || isNewDateGroup;
     return `
       <tr${isNewDateGroup ? ' class="date-group-start"' : ''}>
-        <td>${fmtEntryDate(e.date)}</td>
+        <td>${showDate ? fmtEntryDate(e.date) : ''}</td>
         <td><span class="badge ${badgeClass}">${badgeText}</span></td>
         <td>${escapeHtml(acctLabel)}</td>
         <td>${tag?`<span class="tag-pill">${escapeHtml(tag.name)}</span>`:''}</td>
