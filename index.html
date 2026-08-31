@@ -103,6 +103,7 @@
   th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--border-muted);}
   th{font-weight:600;color:var(--text-muted);font-size:12px;text-transform:uppercase;letter-spacing:.02em;}
   tbody tr:hover{background:var(--bg);}
+  tbody tr.date-group-start td{border-top:2px solid var(--border);}
   td.num{text-align:right;font-family:var(--mono);}
 
   .badge{display:inline-block;padding:2px 8px;border-radius:2em;font-size:12px;font-weight:600;}
@@ -211,6 +212,7 @@
     </div>
 
     <div id="monthContent" style="display:none;">
+      <h2 id="monthHeading" style="margin:0 0 16px 0;"></h2>
       <div class="grid grid-2">
         <div class="card entry-form-card">
           <h2 id="entryFormTitle">Add Entry</h2>
@@ -451,6 +453,18 @@ function fmtMonthLabel(ym){
   return d.toLocaleString('en-US', {month:'long', year:'numeric'});
 }
 
+function fmtEntryDate(dateStr){
+  const [y,m,d] = dateStr.split('-').map(Number);
+  const date = new Date(y, m-1, d);
+  const day = date.getDate();
+  const suffix = (day % 10 === 1 && day !== 11) ? 'st'
+    : (day % 10 === 2 && day !== 12) ? 'nd'
+    : (day % 10 === 3 && day !== 13) ? 'rd'
+    : 'th';
+  const weekday = date.toLocaleDateString('en-US', {weekday:'long'});
+  return `${day}${suffix} (${weekday})`;
+}
+
 /* ============================= MASTER DATA VIEW ============================= */
 
 function renderMasterData(){
@@ -622,6 +636,7 @@ function renderEntriesView(){
   }
 
   document.getElementById('monthContent').style.display='block';
+  document.getElementById('monthHeading').textContent = fmtMonthLabel(getMonth(currentMonthId).label);
   populateAccountSelects();
   populateTagSelect();
   setEntryDateBounds();
@@ -858,7 +873,7 @@ function renderEntryTable(){
     ? `${sorted.length} entries`
     : `${sorted.length} of ${month.entries.length} entries`;
 
-  tbody.innerHTML = sorted.map(e=>{
+  tbody.innerHTML = sorted.map((e,idx)=>{
     const tag = getTag(e.tagId);
     let acctLabel;
     let badgeClass, badgeText;
@@ -872,9 +887,10 @@ function renderEntryTable(){
       badgeClass = e.type==='incoming' ? 'badge-in' : 'badge-out';
       badgeText = e.type==='incoming' ? 'Incoming' : 'Outgoing';
     }
+    const isNewDateGroup = sortField==='date' && idx>0 && sorted[idx-1].date!==e.date;
     return `
-      <tr>
-        <td>${e.date}</td>
+      <tr${isNewDateGroup ? ' class="date-group-start"' : ''}>
+        <td>${fmtEntryDate(e.date)}</td>
         <td><span class="badge ${badgeClass}">${badgeText}</span></td>
         <td>${escapeHtml(acctLabel)}</td>
         <td>${tag?`<span class="tag-pill">${escapeHtml(tag.name)}</span>`:''}</td>
