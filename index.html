@@ -561,6 +561,12 @@ document.getElementById('tagForm').addEventListener('submit', e=>{
 let entriesYearFilter = 'all';
 
 function renderEntriesView(){
+  // Keep the sort state in sync with the dropdown on initial render/reload.
+  // Browsers can restore the selected option visually after a reload, while
+  // the JavaScript variable has been reset to its default.
+  const sortSelect = document.getElementById('sortEntries');
+  if(sortSelect) entrySort = sortSelect.value;
+
   const sel = document.getElementById('monthSelector');
   const allMonths = [...state.months].sort((a,b)=> a.label.localeCompare(b.label));
 
