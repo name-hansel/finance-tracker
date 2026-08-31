@@ -250,7 +250,7 @@
             <div class="field-row">
               <div class="field">
                 <label>Tag</label>
-                <select id="entryTag"></select>
+                <select id="entryTag" required></select>
               </div>
               <div class="field">
                 <label>Amount</label>
@@ -662,11 +662,14 @@ function populateAccountSelects(){
   if([...filterAcc.options].some(o=>o.value===prevAcc)) filterAcc.value = prevAcc;
 }
 function populateTagSelect(){
-  document.getElementById('entryTag').innerHTML = state.tags.map(t=>`<option value="${t.id}">${escapeHtml(t.name)}</option>`).join('');
+  const sortedTags = [...state.tags].sort((a,b)=> a.name.localeCompare(b.name));
+  const tagOptions = sortedTags.map(t=>`<option value="${t.id}">${escapeHtml(t.name)}</option>`).join('');
+
+  document.getElementById('entryTag').innerHTML = `<option value="" disabled selected>Select a tag...</option>` + tagOptions;
 
   const filterTag = document.getElementById('filterTag');
   const prevTag = filterTag.value;
-  filterTag.innerHTML = `<option value="all">All</option>` + state.tags.map(t=>`<option value="${t.id}">${escapeHtml(t.name)}</option>`).join('');
+  filterTag.innerHTML = `<option value="all">All</option>` + tagOptions;
   if([...filterTag.options].some(o=>o.value===prevTag)) filterTag.value = prevTag;
 }
 
@@ -767,6 +770,7 @@ document.getElementById('entryForm').addEventListener('submit', e=>{
   const amount = parseFloat(document.getElementById('entryAmount').value);
 
   if(!date){ showToast('Please pick a date'); return; }
+  if(!tagId){ showToast('Please select a tag'); return; }
 
   const [selectedYear, selectedMonth] = date.split('-').map(Number);
   const [sheetYear, sheetMonth] = month.label.split('-').map(Number);
