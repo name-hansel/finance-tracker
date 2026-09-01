@@ -62,7 +62,26 @@
     padding:16px;margin-bottom:16px;
   }
   .card h2{font-size:14px;margin:0 0 12px 0;font-weight:600;}
-  .card h3{font-size:13px;margin:0 0 8px 0;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.03em;}
+  .card h3{font-size:13px;margin:0 0 8px 0;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.03em;display:flex;align-items:center;gap:6px;}
+
+  .info-icon{
+    display:inline-flex;align-items:center;justify-content:center;
+    width:14px;height:14px;border-radius:50%;background:var(--border);color:var(--panel);
+    font-size:10px;font-weight:700;font-style:normal;text-transform:none;letter-spacing:normal;
+    cursor:help;position:relative;flex-shrink:0;
+  }
+  .info-icon:hover,.info-icon:focus{background:var(--text-muted);}
+  .info-icon .info-tooltip{
+    display:none;position:absolute;bottom:135%;left:50%;transform:translateX(-50%);
+    background:var(--text);color:#fff;padding:8px 10px;border-radius:var(--radius);
+    font-size:12px;font-weight:400;line-height:1.4;width:240px;z-index:20;
+    box-shadow:0 4px 12px rgba(0,0,0,.18);text-align:left;text-transform:none;letter-spacing:normal;
+  }
+  .info-icon:hover .info-tooltip,.info-icon:focus .info-tooltip{display:block;}
+  .info-icon .info-tooltip::after{
+    content:"";position:absolute;top:100%;left:50%;transform:translateX(-50%);
+    border:5px solid transparent;border-top-color:var(--text);
+  }
 
   .grid{display:grid;gap:16px;}
   .grid-2{grid-template-columns:1fr 1fr;}
@@ -459,6 +478,10 @@ function confirmModal(title, body, onConfirm){
 
 function escapeHtml(s){
   return String(s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+function infoIcon(text){
+  return `<span class="info-icon" tabindex="0" role="img" aria-label="Info">i<span class="info-tooltip">${escapeHtml(text)}</span></span>`;
 }
 
 function fmtMoney(n){
@@ -1125,7 +1148,7 @@ function renderDashboard(){
 
     <div class="grid grid-2">
       <div class="card">
-        <h3>Top tags by spend</h3>
+        <h3>Top tags by spend${infoIcon('Groups all Outgoing entries for this month by tag, ranked by total amount. The percentage shown is that tag\'s share of your total outgoing this month.')}</h3>
         ${topTags.length? topTags.map(t=>`
           <div class="bar-row">
             <div class="bar-label" title="${escapeHtml(t.tag?t.tag.name:'?')}">${escapeHtml(t.tag?t.tag.name:'?')}</div>
@@ -1136,7 +1159,7 @@ function renderDashboard(){
       </div>
 
       <div class="card">
-        <h3>Credit card: spend vs payback</h3>
+        <h3>Credit card: spend vs payback${infoIcon('Spent = total Outgoing entries from your Credit Card account this month. Paid back = total Transfers into the Credit Card account this month. Outstanding = Spent minus Paid back. Card balance = opening balance plus every Credit Card transaction to date.')}</h3>
         ${ccAccount ? `
           <div class="bar-row">
             <div class="bar-label">Spent</div>
@@ -1155,7 +1178,7 @@ function renderDashboard(){
 
     <div class="grid grid-2" style="margin-top:16px;">
       <div class="card">
-        <h3>Spending account runway</h3>
+        <h3>Spending account runway${infoIcon('Current balance = opening balance plus every transaction on the Spending account to date. Average daily burn = total Outgoing from Spending this month divided by days elapsed. Days left = current balance divided by average daily burn.')}</h3>
         ${spendAccount ? `
           <p>Current balance: <strong>${fmtMoney(currentSpendBalance)}</strong></p>
           <p>Avg daily burn (this month so far): <strong>${fmtMoney(avgDailyBurn)}</strong></p>
@@ -1166,7 +1189,7 @@ function renderDashboard(){
       </div>
 
       <div class="card">
-        <h3>Salary → Spending transfer ratio</h3>
+        <h3>Salary → Spending transfer ratio${infoIcon('Salary incoming = total Incoming entries to the Salary account this month. Transferred to Spending = total Transfers from Salary to Spending this month. Ratio = Transferred to Spending divided by Salary incoming, as a percentage.')}</h3>
         ${salaryAccount && spendAccount ? `
           <p>Salary incoming: <strong>${fmtMoney(salaryIncoming)}</strong></p>
           <p>Transferred to Spending: <strong>${fmtMoney(salaryToSpendTransfer)}</strong></p>
@@ -1179,12 +1202,12 @@ function renderDashboard(){
     </div>
 
     <div class="card" style="margin-top:16px;">
-      <h3>Month-over-month trend per tag (last ${last6.length} month${last6.length>1?'s':''})</h3>
+      <h3>Month-over-month trend per tag (last ${last6.length} month${last6.length>1?'s':''})${infoIcon('Plots total Outgoing spend per month for your top 5 tags (by combined spend), across the last 6 months up to the selected month — so you can spot categories that are creeping up or down over time.')}</h3>
       <div id="tagTrendChart"></div>
     </div>
 
     <div class="card" style="margin-top:16px;">
-      <h3>Incoming vs outgoing over time</h3>
+      <h3>Incoming vs outgoing over time${infoIcon('Plots total Incoming, total Outgoing, and Net (Incoming minus Outgoing) for every month sheet you\'ve created, in chronological order — a quick view of your overall savings trend.')}</h3>
       <div id="trendChart"></div>
     </div>
   `;
