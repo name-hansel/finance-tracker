@@ -196,6 +196,30 @@
   .date-nav-btn:disabled{opacity:.4;cursor:not-allowed;}
   .date-nav-today{font-size:12px;}
 
+
+
+  .entries-balance-header{border-bottom:1px solid var(--border);background:var(--panel);}
+  .entries-balance-inner{max-width:1200px;margin:0 auto;padding:10px 20px;display:flex;flex-direction:column;align-items:center;gap:8px;}
+  .entries-balance-title{font-size:13px;font-weight:700;color:var(--text);text-align:center;}
+  .entries-balance-header .account-balance-strip{margin:0;width:100%;min-width:0;}
+  .entries-balance-header .account-balance-cards{display:flex;justify-content:center;align-items:stretch;gap:12px;flex-wrap:nowrap;overflow-x:auto;width:100%;}
+  .entries-balance-header .account-balance-card{flex:1 1 180px;min-width:140px;max-width:240px;padding:6px 10px;text-align:center;}
+  .entries-balance-header .account-balance-name{text-align:center;}
+  .entries-balance-header .account-balance-value{font-size:14px;}
+  .entries-balance-header .account-balance-value.neg{color:var(--danger);}
+  @media(max-width:700px){
+    .entries-balance-inner{padding:8px 16px;}
+    .entries-balance-header .account-balance-cards{justify-content:flex-start;}
+    .entries-balance-header .account-balance-card{flex:0 0 160px;}
+  }
+
+  .account-balance-strip{margin:0 0 16px 0;}
+  .account-balance-strip h3{margin:0 0 8px 0;font-size:14px;font-weight:600;}
+  .account-balance-cards{display:flex;gap:8px;flex-wrap:wrap;}
+  .account-balance-card{flex:1 1 150px;min-width:130px;background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:9px 12px;}
+  .account-balance-name{font-size:12px;color:var(--text-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .account-balance-value{margin-top:2px;font-family:var(--mono);font-size:15px;font-weight:600;}
+
   .comment-cell {
       max-width: 220px;
       overflow: hidden;
@@ -221,6 +245,13 @@
   <button data-view="masterdata">Master Data</button>
 </nav>
 
+<div id="entriesBalanceHeader" class="entries-balance-header" style="display:none;">
+  <div class="entries-balance-inner">
+    <div class="entries-balance-title">Account Balances</div>
+    <div id="accountBalanceStrip" class="account-balance-strip"></div>
+  </div>
+</div>
+
 <main>
 
   <!-- DASHBOARD VIEW -->
@@ -245,7 +276,7 @@
     </div>
 
     <div id="monthContent" style="display:none;">
-      <h2 id="monthHeading" style="margin:0 0 16px 0;"></h2>
+      <h2 id="monthHeading" style="margin:0 0 12px 0;"></h2>
       <div class="grid grid-2 entries-layout">
         <div class="card entry-form-card">
           <h2 id="entryFormTitle">Add Entry</h2>
@@ -444,6 +475,8 @@ document.querySelectorAll('nav.tabs button').forEach(btn=>{
     btn.classList.add('active');
     document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
     document.getElementById('view-'+btn.dataset.view).classList.add('active');
+    const balanceHeader = document.getElementById('entriesBalanceHeader');
+    if(balanceHeader) balanceHeader.style.display = btn.dataset.view==='entries' ? 'block' : 'none';
     if(btn.dataset.view==='dashboard') renderDashboard();
     if(btn.dataset.view==='entries') renderEntriesView();
     if(btn.dataset.view==='masterdata') renderMasterData();
@@ -603,6 +636,8 @@ document.getElementById('tagForm').addEventListener('submit', e=>{
 let entriesYearFilter = 'all';
 
 function renderEntriesView(){
+  const balanceHeader = document.getElementById('entriesBalanceHeader');
+  if(balanceHeader) balanceHeader.style.display='block';
   // Keep the sort state in sync with the dropdown on initial render/reload.
   // Browsers can restore the selected option visually after a reload, while
   // the JavaScript variable has been reset to its default.
@@ -668,6 +703,8 @@ function renderEntriesView(){
   if(btnEmpty) btnEmpty.addEventListener('click', addMonthFlow);
 
   if(allMonths.length===0){
+    const balanceStrip = document.getElementById('accountBalanceStrip');
+    if(balanceStrip) balanceStrip.innerHTML='';
     document.getElementById('noMonthCard').style.display='block';
     document.getElementById('monthContent').style.display='none';
     return;
@@ -675,6 +712,8 @@ function renderEntriesView(){
   document.getElementById('noMonthCard').style.display='none';
 
   if(sortedMonths.length===0){
+    const balanceStrip = document.getElementById('accountBalanceStrip');
+    if(balanceStrip) balanceStrip.innerHTML='';
     document.getElementById('monthContent').style.display='none';
     return;
   }
@@ -685,6 +724,7 @@ function renderEntriesView(){
 
   document.getElementById('monthContent').style.display='block';
   document.getElementById('monthHeading').textContent = fmtMonthLabel(getMonth(currentMonthId).label);
+  renderAccountBalances();
   populateAccountSelects();
   populateTagSelect();
   setEntryDateBounds();
@@ -915,7 +955,27 @@ document.getElementById('entryForm').addEventListener('submit', e=>{
   renderEntryTable();
 });
 
+function renderAccountBalances(){
+  const el = document.getElementById('accountBalanceStrip');
+  const month = getMonth(currentMonthId);
+  if(!el || !month) return;
+
+  const balances = computeBalancesUpTo(month.label);
+  el.innerHTML = `
+    <div class="account-balance-cards">
+      ${state.accounts.map(account=>{
+        const balance = balances[account.id] || 0;
+        return `
+        <div class="account-balance-card">
+          <div class="account-balance-name">${escapeHtml(account.name)}</div>
+          <div class="account-balance-value ${balance < 0 ? 'neg' : 'pos'}">${fmtMoney(balance)}</div>
+        </div>`;
+      }).join('')}
+    </div>`;
+}
+
 function renderEntryTable(){
+  renderAccountBalances();
   const month = getMonth(currentMonthId);
   const tbody = document.getElementById('entryTableBody');
   if(!month || month.entries.length===0){
