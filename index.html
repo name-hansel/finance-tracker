@@ -690,10 +690,10 @@ function renderEntriesView(){
   if(sortSelect) entrySort = sortSelect.value;
 
   const sel = document.getElementById('monthSelector');
-  const allMonths = [...state.months].sort((a,b)=> a.label.localeCompare(b.label));
+  const allMonths = [...state.months].sort((a,b)=> b.label.localeCompare(a.label));
 
   // build year filter options from existing months
-  const years = Array.from(new Set(allMonths.map(m=>m.label.slice(0,4)))).sort();
+  const years = Array.from(new Set(allMonths.map(m=>m.label.slice(0,4)))).sort((a,b)=> b.localeCompare(a));
   if(entriesYearFilter!=='all' && !years.includes(entriesYearFilter)) entriesYearFilter = 'all';
 
   const yearFilterHtml = years.length>0 ? `
@@ -768,7 +768,7 @@ function renderEntriesView(){
   }
 
   if(!currentMonthId || !getMonth(currentMonthId) || !sortedMonths.some(m=>m.id===currentMonthId)){
-    currentMonthId = sortedMonths[sortedMonths.length-1].id;
+    currentMonthId = sortedMonths[0].id;
   }
 
   document.getElementById('monthContent').style.display='block';
@@ -1170,8 +1170,9 @@ function renderDashboard(){
   if(!hasData){ saveState(); return; }
 
   const sortedMonths = [...state.months].sort((a,b)=>a.label.localeCompare(b.label));
-  let selectedMonthId = dashboardSelectedMonth || sortedMonths[sortedMonths.length-1].id;
-  if(!getMonth(selectedMonthId)) selectedMonthId = sortedMonths[sortedMonths.length-1].id;
+  const monthOptions = [...sortedMonths].reverse();
+  let selectedMonthId = dashboardSelectedMonth || monthOptions[0].id;
+  if(!getMonth(selectedMonthId)) selectedMonthId = monthOptions[0].id;
   dashboardSelectedMonth = selectedMonthId;
 
   const month = getMonth(selectedMonthId);
@@ -1246,7 +1247,7 @@ function renderDashboard(){
 
   const html = `
     <div class="month-selector">
-      ${sortedMonths.map(m=>`<button class="month-chip ${m.id===selectedMonthId?'active':''}" data-dm="${m.id}">${fmtMonthLabel(m.label)}</button>`).join('')}
+      ${monthOptions.map(m=>`<button class="month-chip ${m.id===selectedMonthId?'active':''}" data-dm="${m.id}">${fmtMonthLabel(m.label)}</button>`).join('')}
     </div>
 
     <div class="grid grid-4" style="margin-bottom:16px;">
