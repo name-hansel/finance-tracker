@@ -1173,11 +1173,12 @@ function renderDashboard(){
   const sortedMonths = [...state.months].sort((a,b)=>a.label.localeCompare(b.label));
   const monthOptions = [...sortedMonths].reverse();
   let selectedMonthId = dashboardSelectedMonth || monthOptions[0].id;
-  if(!getMonth(selectedMonthId)) selectedMonthId = monthOptions[0].id;
+  if(selectedMonthId !== '__last3__' && !getMonth(selectedMonthId)) selectedMonthId = monthOptions[0].id;
   dashboardSelectedMonth = selectedMonthId;
 
-  const month = getMonth(selectedMonthId);
-  const entries = month.entries;
+  const showMultiMonth = selectedMonthId === '__last3__';
+  const month = showMultiMonth ? sortedMonths[sortedMonths.length-1] : getMonth(selectedMonthId);
+  const entries = showMultiMonth ? [] : month.entries;
 
   const totalIn = entries.filter(e=>e.type==='incoming').reduce((s,e)=>s+e.amount,0);
   const totalOut = entries.filter(e=>e.type==='outgoing').reduce((s,e)=>s+e.amount,0);
@@ -1195,9 +1196,10 @@ function renderDashboard(){
     .map(([tagId,amt])=>({tag:getTag(tagId), amt, pct: totalOut? (amt/totalOut*100):0}));
 
   // MoM trend per tag (last up to 6 months including current)
-  const last6 = sortedMonths.filter(m=>m.label<=month.label).slice(-6);
+  const trendEndLabel = month ? month.label : sortedMonths[sortedMonths.length-1]?.label;
+  const lastTrendMonths = sortedMonths.filter(m=>m.label<=trendEndLabel).slice(-3);
   const tagTrend = {};
-  last6.forEach(m=>{
+  lastTrendMonths.forEach(m=>{
     m.entries.filter(e=>e.type==='outgoing').forEach(e=>{
       const t = getTag(e.tagId)?.name || 'Unknown';
       tagTrend[t] = tagTrend[t] || {};
@@ -1248,9 +1250,11 @@ function renderDashboard(){
 
   const html = `
     <div class="month-selector">
+      <button class="month-chip ${showMultiMonth?'active':''}" data-dm="__last3__">Last 3 Months</button>
       ${monthOptions.map(m=>`<button class="month-chip ${m.id===selectedMonthId?'active':''}" data-dm="${m.id}">${fmtMonthLabel(m.label)}</button>`).join('')}
     </div>
 
+    ${!showMultiMonth ? `
     <div class="grid grid-4" style="margin-bottom:16px;">
       <div class="stat"><div class="label">Incoming</div><div class="value pos">${fmtMoney(totalIn)}</div></div>
       <div class="stat"><div class="label">Outgoing</div><div class="value neg">${fmtMoney(totalOut)}</div></div>
@@ -1322,8 +1326,10 @@ function renderDashboard(){
       </div>
     </div>
 
+    ` : ''}
+    ${showMultiMonth ? `
     <div class="card" style="margin-top:16px;">
-      <h3>Month-over-month trend per tag (last ${last6.length} month${last6.length>1?'s':''})${infoIcon('Plots total Outgoing spend per month for your top 5 tags (by combined spend), across the last 6 months up to the selected month — so you can spot categories that are creeping up or down over time.')}</h3>
+      <h3>Month-over-month trend per tag (last ${lastTrendMonths.length} month${lastTrendMonths.length>1?'s':''})${infoIcon('Plots total Outgoing spend per month for your top 5 tags (by combined spend), across the last 3 months up to the latest month — so you can spot categories that are creeping up or down over time.')}</h3>
       <div id="tagTrendChart"></div>
     </div>
 
@@ -1331,6 +1337,7 @@ function renderDashboard(){
       <h3>Incoming vs outgoing over time${infoIcon('Plots total Incoming, total Outgoing, and Net (Incoming minus Outgoing) for every month sheet you\'ve created, in chronological order — a quick view of your overall savings trend.')}</h3>
       <div id="trendChart"></div>
     </div>
+    ` : ''}
   `;
 
   document.getElementById('dashboardContent').innerHTML = html;
@@ -1339,8 +1346,10 @@ function renderDashboard(){
     btn.addEventListener('click', ()=>{ dashboardSelectedMonth = btn.dataset.dm; renderDashboard(); });
   });
 
-  drawTagTrendChart('tagTrendChart', last6.map(m=>m.label), topTrendTags, tagTrend);
-  drawTrendChart('trendChart', trendMonths.map(m=>m.label), trendIn, trendOut, trendNet);
+  if(showMultiMonth){
+    drawTagTrendChart('tagTrendChart', lastTrendMonths.map(m=>m.label), topTrendTags, tagTrend);
+    drawTrendChart('trendChart', trendMonths.map(m=>m.label), trendIn, trendOut, trendNet);
+  }
 
   saveState();
 }
