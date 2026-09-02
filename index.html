@@ -43,7 +43,7 @@
   .topbar-actions{display:flex;gap:8px;}
 
   nav.tabs{
-    display:flex;gap:2px;background:var(--panel);border-bottom:1px solid var(--border);
+    display:flex;align-items:center;gap:2px;background:var(--panel);border-bottom:1px solid var(--border);
     padding:0 20px;overflow-x:auto;
   }
   nav.tabs button{
@@ -53,6 +53,7 @@
   }
   nav.tabs button:hover{color:var(--text);}
   nav.tabs button.active{color:var(--text);border-bottom-color:var(--accent);}
+  .tabs-last-updated{margin-left:auto;display:flex;align-items:center;padding:10px 0 10px 12px;font-size:12px;color:var(--text-muted);white-space:nowrap;line-height:1;}
 
   main{max-width:1200px;margin:0 auto;padding:20px;}
   .view{display:none;}
@@ -259,7 +260,6 @@
 
 <header class="topbar">
   <h1><span class="logo">₹</span> Finance Tracker</h1>
-  <div class="last-updated" id="lastUpdated" style="display:none;"></div>
   <div class="topbar-actions">
     <button class="btn" id="btnExport">Export JSON</button>
     <button class="btn" id="btnImport">Import JSON</button>
@@ -271,6 +271,7 @@
   <button data-view="dashboard" class="active">Dashboard</button>
   <button data-view="entries">Entries</button>
   <button data-view="masterdata">Master Data</button>
+  <div class="tabs-last-updated" id="lastUpdated" style="display:none;"></div>
 </nav>
 
 <!-- ENTRIES ACCOUNT BALANCES HEADER -->
