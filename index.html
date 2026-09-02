@@ -35,6 +35,7 @@
     position:sticky;top:0;z-index:10;
   }
   header.topbar h1{font-size:16px;margin:0;font-weight:600;display:flex;align-items:center;gap:8px;}
+  .last-updated{font-size:12px;color:var(--text-muted);margin-left:auto;margin-right:8px;white-space:nowrap;}
   header.topbar h1 .logo{
     width:20px;height:20px;border-radius:4px;background:var(--text);
     display:inline-flex;align-items:center;justify-content:center;color:#fff;font-size:12px;font-weight:700;
@@ -258,6 +259,7 @@
 
 <header class="topbar">
   <h1><span class="logo">₹</span> Finance Tracker</h1>
+  <div class="last-updated" id="lastUpdated" style="display:none;"></div>
   <div class="topbar-actions">
     <button class="btn" id="btnExport">Export JSON</button>
     <button class="btn" id="btnImport">Import JSON</button>
@@ -552,6 +554,23 @@ function fmtMonthLabel(ym){
   return d.toLocaleString('en-US', {month:'long', year:'numeric'});
 }
 
+function updateLastUpdated(){
+  const el = document.getElementById('lastUpdated');
+  if(!el) return;
+  const entries = state.months.flatMap(m => m.entries || []);
+  if(entries.length===0){
+    el.textContent='';
+    el.style.display='none';
+    return;
+  }
+  const latestDate = entries.reduce((latest, e) => e.date > latest ? e.date : latest, '');
+  const [y,m,d] = latestDate.split('-').map(Number);
+  const date = new Date(y, m-1, d);
+  const formatted = date.toLocaleDateString('en-IN', {day:'numeric', month:'long', year:'numeric'});
+  el.textContent = `Last updated for: ${formatted}`;
+  el.style.display='block';
+}
+
 function fmtEntryDate(dateStr){
   const [y,m,d] = dateStr.split('-').map(Number);
   const date = new Date(y, m-1, d);
@@ -567,6 +586,7 @@ function fmtEntryDate(dateStr){
 /* ============================= MASTER DATA VIEW ============================= */
 
 function renderMasterData(){
+  updateLastUpdated();
   const accBody = document.getElementById('accountsTableBody');
   accBody.innerHTML = state.accounts.map(a=>`
     <tr>
@@ -660,6 +680,7 @@ document.getElementById('tagForm').addEventListener('submit', e=>{
 let entriesYearFilter = 'all';
 
 function renderEntriesView(){
+  updateLastUpdated();
   const balanceHeader = document.getElementById('entriesBalanceHeader');
   if(balanceHeader) balanceHeader.style.display='none';
   // Keep the sort state in sync with the dropdown on initial render/reload.
@@ -1142,6 +1163,7 @@ function loadEntryForEdit(id){
 /* ============================= DASHBOARD ============================= */
 
 function renderDashboard(){
+  updateLastUpdated();
   const hasData = state.months.some(m=>m.entries.length>0);
   document.getElementById('dashboardEmpty').style.display = hasData ? 'none' : 'block';
   document.getElementById('dashboardContent').style.display = hasData ? 'block' : 'none';
