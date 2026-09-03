@@ -108,7 +108,7 @@
   .entry-type-date-row > .field:first-child{flex:0 0 120px;}
   .input-currency{position:relative;}
   .input-currency::before{
-    content:"₹";position:absolute;left:10px;top:50%;transform:translateY(-50%);
+    content:var(--currency-symbol, "₹");position:absolute;left:10px;top:50%;transform:translateY(-50%);
     color:var(--text-muted);font-size:14px;pointer-events:none;
   }
   .input-currency input{padding-left:24px;}
@@ -123,6 +123,8 @@
   button.btn-danger{color:var(--red);}
   button.btn-danger:hover{background:var(--red-bg);border-color:var(--red);}
   button.btn-sm{padding:3px 8px;font-size:12px;}
+  .currency-selector{width:auto;min-width:92px;max-width:190px;padding:6px 28px 6px 8px;font-size:13px;}
+
   button:disabled{opacity:.5;cursor:not-allowed;}
 
   table{width:100%;border-collapse:collapse;font-size:13px;}
@@ -261,6 +263,17 @@
 <header class="topbar">
   <h1><span class="logo">₹</span> Finance Tracker</h1>
   <div class="topbar-actions">
+    <select id="currencySelector" class="currency-selector" aria-label="Currency symbol" title="Currency symbol">
+      <option value="₹">₹ Rupee (INR)</option>
+      <option value="$">$ Dollar (USD)</option>
+      <option value="€">€ Euro (EUR)</option>
+      <option value="£">£ Pound (GBP)</option>
+      <option value="¥">¥ Yen / Yuan (JPY / CNY)</option>
+      <option value="₩">₩ Won (KRW)</option>
+      <option value="A$">A$ Australian Dollar (AUD)</option>
+      <option value="C$">C$ Canadian Dollar (CAD)</option>
+      <option value="CHF">CHF Swiss Franc</option>
+    </select>
     <button class="btn" id="btnExport">Export JSON</button>
     <button class="btn" id="btnImport">Import JSON</button>
     <input type="file" id="fileImport" accept="application/json" style="display:none;">
@@ -544,9 +557,31 @@ function infoIcon(text){
   return `<span class="info-icon" tabindex="0" role="img" aria-label="Info">i<span class="info-tooltip">${escapeHtml(text)}</span></span>`;
 }
 
+const CURRENCY_STORAGE_KEY = 'financeTrackerCurrency_v1';
+let currencySymbol = '₹';
+
+function applyCurrencySymbol(symbol){
+  currencySymbol = symbol || '₹';
+  document.documentElement.style.setProperty('--currency-symbol', JSON.stringify(currencySymbol));
+  const selector = document.getElementById('currencySelector');
+  if(selector) selector.value = currencySymbol;
+  const logo = document.querySelector('header.topbar h1 .logo');
+  if(logo) logo.textContent = currencySymbol;
+}
+
+function loadCurrencySymbol(){
+  try{
+    const saved = localStorage.getItem(CURRENCY_STORAGE_KEY);
+    if(saved) applyCurrencySymbol(saved);
+    else applyCurrencySymbol('₹');
+  } catch(err){
+    applyCurrencySymbol('₹');
+  }
+}
+
 function fmtMoney(n){
   const sign = n<0 ? '-' : '';
-  return sign + '₹' + Math.abs(n).toLocaleString('en-IN', {minimumFractionDigits:2, maximumFractionDigits:2});
+  return sign + currencySymbol + Math.abs(n).toLocaleString('en-IN', {minimumFractionDigits:2, maximumFractionDigits:2});
 }
 
 function fmtMonthLabel(ym){
@@ -1478,6 +1513,17 @@ function drawTrendChart(containerId, months, inArr, outArr, netArr){
 }
 
 /* ============================= IMPORT / EXPORT ============================= */
+
+const currencySelector = document.getElementById('currencySelector');
+currencySelector.addEventListener('change', ()=>{
+  applyCurrencySymbol(currencySelector.value);
+  try{ localStorage.setItem(CURRENCY_STORAGE_KEY, currencySymbol); } catch(err){}
+  renderMasterData();
+  renderEntriesView();
+  renderDashboard();
+});
+
+loadCurrencySymbol();
 
 document.getElementById('btnExport').addEventListener('click', ()=>{
   const data = JSON.stringify(state, null, 2);
