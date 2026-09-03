@@ -555,6 +555,12 @@ function fmtMonthLabel(ym){
   return d.toLocaleString('en-US', {month:'long', year:'numeric'});
 }
 
+function fmtMonthShort(ym){
+  const [y,m] = ym.split('-');
+  const d = new Date(parseInt(y), parseInt(m)-1, 1);
+  return d.toLocaleString('en-US', {month:'short'}) + " '" + y.slice(2);
+}
+
 function updateLastUpdated(){
   const el = document.getElementById('lastUpdated');
   if(!el) return;
@@ -1386,7 +1392,7 @@ function computeBalancesUpTo(monthLabel){
 function drawTagTrendChart(containerId, months, tags, tagTrend){
   const el = document.getElementById(containerId);
   if(months.length===0 || tags.length===0){ el.innerHTML = '<p class="muted">Not enough data yet.</p>'; return; }
-  const w=680,h=240,padL=50,padB=30,padT=10,padR=10;
+  const w=680,h=240,padL=50,padB=30,padT=10,padR=28;
   const chartW = w-padL-padR, chartH = h-padT-padB;
   let maxVal=0;
   tags.forEach(t=> months.forEach(m=> maxVal = Math.max(maxVal, (tagTrend[t]&&tagTrend[t][m])||0) ));
@@ -1403,7 +1409,7 @@ function drawTagTrendChart(containerId, months, tags, tagTrend){
   }
   months.forEach((m,i)=>{
     const x = padL + xStep*i;
-    svg += `<text x="${x}" y="${h-8}" font-size="10" fill="var(--text-muted)" text-anchor="middle">${m.slice(5)}</text>`;
+    svg += `<text x="${x}" y="${h-8}" font-size="10" fill="var(--text-muted)" text-anchor="middle">${fmtMonthShort(m)}</text>`;
   });
   tags.forEach((tag,ti)=>{
     const pts = months.map((m,i)=>{
@@ -1430,7 +1436,7 @@ function drawTagTrendChart(containerId, months, tags, tagTrend){
 function drawTrendChart(containerId, months, inArr, outArr, netArr){
   const el = document.getElementById(containerId);
   if(months.length===0){ el.innerHTML='<p class="muted">No data yet.</p>'; return; }
-  const w=680,h=240,padL=55,padB=30,padT=10,padR=10;
+  const w=680,h=240,padL=55,padB=30,padT=10,padR=28;
   const chartW=w-padL-padR, chartH=h-padT-padB;
   const allVals = [...inArr, ...outArr, ...netArr];
   const maxVal = Math.max(...allVals, 1);
@@ -1447,9 +1453,11 @@ function drawTrendChart(containerId, months, inArr, outArr, netArr){
     svg += `<line x1="${padL}" y1="${y}" x2="${w-padR}" y2="${y}" stroke="var(--border-muted)" stroke-width="1"/>`;
     svg += `<text x="${padL-6}" y="${y+3}" font-size="10" fill="var(--text-muted)" text-anchor="end">${Math.round(v)}</text>`;
   }
+  const labelStep = months.length > 8 ? Math.ceil(months.length/8) : 1;
   months.forEach((m,i)=>{
+    if(i % labelStep !== 0 && i !== months.length-1) return;
     const x = padL + xStep*i;
-    svg += `<text x="${x}" y="${h-8}" font-size="10" fill="var(--text-muted)" text-anchor="middle">${m.slice(5)}/${m.slice(2,4)}</text>`;
+    svg += `<text x="${x}" y="${h-8}" font-size="10" fill="var(--text-muted)" text-anchor="middle">${fmtMonthShort(m)}</text>`;
   });
 
   function line(arr, color){
