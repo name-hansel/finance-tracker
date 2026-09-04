@@ -484,6 +484,13 @@
 /* ============================= STATE ============================= */
 
 const DEFAULT_TAGS = ["Food","Groceries","Rent","Transport","Shopping","Bills","Entertainment","Health","Salary","Cashback","Other"];
+const STORAGE_KEY = 'financeTrackerState_v1';
+const CURRENCY_STORAGE_KEY = 'financeTrackerCurrency_v1';
+const DEFAULT_CURRENCY = '₹';
+const DEFAULT_ENTRY_SORT = 'added-desc';
+
+const $ = id => document.getElementById(id);
+const $$ = selector => document.querySelectorAll(selector);
 
 let state = {
   accounts: [
@@ -498,14 +505,21 @@ let state = {
 let currentMonthId = null;
 let editingEntryId = null;
 let entryFilters = { type:'all', account:'all', tag:'all', search:'' };
-let entrySort = 'added-desc';
+let entrySort = DEFAULT_ENTRY_SORT;
+let entriesYearFilter = 'all';
 let entriesFullscreen = false;
+let dashboardSelectedMonth = null;
+let currencySymbol = DEFAULT_CURRENCY;
 
-function uid(){ return Math.random().toString(36).slice(2,10)+Date.now().toString(36); }
+function uid(){
+  return Math.random().toString(36).slice(2,10) + Date.now().toString(36);
+}
 
-function getAccount(id){ return state.accounts.find(a=>a.id===id); }
-function getTag(id){ return state.tags.find(t=>t.id===id); }
-function getMonth(id){ return state.months.find(m=>m.id===id); }
+function getAccount(id){ return state.accounts.find(account => account.id === id); }
+function getTag(id){ return state.tags.find(tag => tag.id === id); }
+function getMonth(id){ return state.months.find(month => month.id === id); }
+function getEntries(){ return state.months.flatMap(month => month.entries || []); }
+function setDisplay(element, visible, display='block'){ if(element) element.style.display = visible ? display : 'none'; }
 
 /* ============================= INIT / NAV ============================= */
 
@@ -523,17 +537,16 @@ document.querySelectorAll('nav.tabs button').forEach(btn=>{
   });
 });
 
-function showToast(msg){
-  const root = document.getElementById('toastRoot');
-  const el = document.createElement('div');
-  el.className='toast';
-  el.textContent=msg;
-  root.appendChild(el);
-  setTimeout(()=>el.remove(), 2200);
+function showToast(message){
+  const element = document.createElement('div');
+  element.className = 'toast';
+  element.textContent = message;
+  $('toastRoot').appendChild(element);
+  setTimeout(() => element.remove(), 2200);
 }
 
 function confirmModal(title, body, onConfirm){
-  const root = document.getElementById('modalRoot');
+  const root = $('modalRoot');
   root.innerHTML = `
     <div class="modal-backdrop">
       <div class="modal">
@@ -545,8 +558,8 @@ function confirmModal(title, body, onConfirm){
         </div>
       </div>
     </div>`;
-  document.getElementById('modalCancel').onclick = ()=> root.innerHTML='';
-  document.getElementById('modalConfirm').onclick = ()=>{ root.innerHTML=''; onConfirm(); };
+  $('modalCancel').onclick = () => root.innerHTML = '';
+  $('modalConfirm').onclick = () => { root.innerHTML = ''; onConfirm(); };
 }
 
 function escapeHtml(s){
@@ -557,13 +570,11 @@ function infoIcon(text){
   return `<span class="info-icon" tabindex="0" role="img" aria-label="Info">i<span class="info-tooltip">${escapeHtml(text)}</span></span>`;
 }
 
-const CURRENCY_STORAGE_KEY = 'financeTrackerCurrency_v1';
-let currencySymbol = '₹';
 
 function applyCurrencySymbol(symbol){
-  currencySymbol = symbol || '₹';
+  currencySymbol = symbol || DEFAULT_CURRENCY;
   document.documentElement.style.setProperty('--currency-symbol', JSON.stringify(currencySymbol));
-  const selector = document.getElementById('currencySelector');
+  const selector = $('currencySelector');
   if(selector) selector.value = currencySymbol;
   const logo = document.querySelector('header.topbar h1 .logo');
   if(logo) logo.textContent = currencySymbol;
@@ -571,58 +582,56 @@ function applyCurrencySymbol(symbol){
 
 function loadCurrencySymbol(){
   try{
-    const saved = localStorage.getItem(CURRENCY_STORAGE_KEY);
-    if(saved) applyCurrencySymbol(saved);
-    else applyCurrencySymbol('₹');
+    applyCurrencySymbol(localStorage.getItem(CURRENCY_STORAGE_KEY) || DEFAULT_CURRENCY);
   } catch(err){
-    applyCurrencySymbol('₹');
+    applyCurrencySymbol(DEFAULT_CURRENCY);
   }
 }
 
-function fmtMoney(n){
-  const sign = n<0 ? '-' : '';
-  return sign + currencySymbol + Math.abs(n).toLocaleString('en-IN', {minimumFractionDigits:2, maximumFractionDigits:2});
+function fmtMoney(amount){
+  const sign = amount < 0 ? '-' : '';
+  return sign + currencySymbol + Math.abs(amount).toLocaleString('en-IN', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  });
 }
 
-function fmtMonthLabel(ym){
-  const [y,m] = ym.split('-');
-  const d = new Date(parseInt(y), parseInt(m)-1, 1);
-  return d.toLocaleString('en-US', {month:'long', year:'numeric'});
+function fmtMonthLabel(yearMonth){
+  const [year, month] = yearMonth.split('-').map(Number);
+  return new Date(year, month - 1, 1).toLocaleString('en-US', {month:'long', year:'numeric'});
 }
 
-function fmtMonthShort(ym){
-  const [y,m] = ym.split('-');
-  const d = new Date(parseInt(y), parseInt(m)-1, 1);
-  return d.toLocaleString('en-US', {month:'short'}) + " '" + y.slice(2);
+function fmtMonthShort(yearMonth){
+  const [year, month] = yearMonth.split('-');
+  return new Date(Number(year), Number(month) - 1, 1).toLocaleString('en-US', {month:'short'}) + " '" + year.slice(2);
 }
 
 function updateLastUpdated(){
-  const el = document.getElementById('lastUpdated');
-  if(!el) return;
-  const entries = state.months.flatMap(m => m.entries || []);
-  if(entries.length===0){
-    el.textContent='';
-    el.style.display='none';
+  const element = $('lastUpdated');
+  if(!element) return;
+  const entries = getEntries();
+  if(entries.length === 0){
+    element.textContent = '';
+    setDisplay(element, false);
     return;
   }
-  const latestDate = entries.reduce((latest, e) => e.date > latest ? e.date : latest, '');
-  const [y,m,d] = latestDate.split('-').map(Number);
-  const date = new Date(y, m-1, d);
-  const formatted = date.toLocaleDateString('en-IN', {day:'numeric', month:'long', year:'numeric'});
-  el.textContent = `Last updated for: ${formatted}`;
-  el.style.display='block';
+  const latestDate = entries.reduce((latest, entry) => entry.date > latest ? entry.date : latest, '');
+  const [year, month, day] = latestDate.split('-').map(Number);
+  const formatted = new Date(year, month - 1, day).toLocaleDateString('en-IN', {
+    day:'numeric', month:'long', year:'numeric'
+  });
+  element.textContent = `Last updated for: ${formatted}`;
+  setDisplay(element, true);
 }
 
-function fmtEntryDate(dateStr){
-  const [y,m,d] = dateStr.split('-').map(Number);
-  const date = new Date(y, m-1, d);
-  const day = date.getDate();
-  const suffix = (day % 10 === 1 && day !== 11) ? 'st'
-    : (day % 10 === 2 && day !== 12) ? 'nd'
-    : (day % 10 === 3 && day !== 13) ? 'rd'
+function fmtEntryDate(dateString){
+  const [year, month, day] = dateString.split('-').map(Number);
+  const date = new Date(year, month - 1, day);
+  const suffix = day % 10 === 1 && day !== 11 ? 'st'
+    : day % 10 === 2 && day !== 12 ? 'nd'
+    : day % 10 === 3 && day !== 13 ? 'rd'
     : 'th';
-  const weekday = date.toLocaleDateString('en-US', {weekday:'long'});
-  return `${day}${suffix} (${weekday})`;
+  return `${day}${suffix} (${date.toLocaleDateString('en-US', {weekday:'long'})})`;
 }
 
 /* ============================= MASTER DATA VIEW ============================= */
@@ -719,12 +728,9 @@ document.getElementById('tagForm').addEventListener('submit', e=>{
 
 /* ============================= ENTRIES VIEW ============================= */
 
-let entriesYearFilter = 'all';
-
 function renderEntriesView(){
   updateLastUpdated();
-  const balanceHeader = document.getElementById('entriesBalanceHeader');
-  if(balanceHeader) balanceHeader.style.display='none';
+  setDisplay($('entriesBalanceHeader'), false);
   // Keep the sort state in sync with the dropdown on initial render/reload.
   // Browsers can restore the selected option visually after a reload, while
   // the JavaScript variable has been reset to its default.
@@ -790,10 +796,8 @@ function renderEntriesView(){
   if(btnEmpty) btnEmpty.addEventListener('click', addMonthFlow);
 
   if(allMonths.length===0){
-    const balanceHeader = document.getElementById('entriesBalanceHeader');
-    if(balanceHeader) balanceHeader.style.display='none';
-    const balanceStrip = document.getElementById('accountBalanceStrip');
-    if(balanceStrip) balanceStrip.innerHTML='';
+    setDisplay($('entriesBalanceHeader'), false);
+    if($('accountBalanceStrip')) $('accountBalanceStrip').innerHTML = '';
     document.getElementById('noMonthCard').style.display='block';
     document.getElementById('monthContent').style.display='none';
     return;
@@ -801,10 +805,8 @@ function renderEntriesView(){
   document.getElementById('noMonthCard').style.display='none';
 
   if(sortedMonths.length===0){
-    const balanceHeader = document.getElementById('entriesBalanceHeader');
-    if(balanceHeader) balanceHeader.style.display='none';
-    const balanceStrip = document.getElementById('accountBalanceStrip');
-    if(balanceStrip) balanceStrip.innerHTML='';
+    setDisplay($('entriesBalanceHeader'), false);
+    if($('accountBalanceStrip')) $('accountBalanceStrip').innerHTML = '';
     document.getElementById('monthContent').style.display='none';
     return;
   }
@@ -815,7 +817,6 @@ function renderEntriesView(){
 
   document.getElementById('monthContent').style.display='block';
   document.getElementById('monthHeading').textContent = fmtMonthLabel(getMonth(currentMonthId).label);
-  renderAccountBalances();
   populateAccountSelects();
   populateTagSelect();
   setEntryDateBounds();
@@ -919,11 +920,12 @@ function applyFullscreenState(){
   }
 }
 
-function getLocalDateString(date=new Date()){
-  const year = date.getFullYear();
-  const month = String(date.getMonth()+1).padStart(2,'0');
-  const day = String(date.getDate()).padStart(2,'0');
-  return `${year}-${month}-${day}`;
+function getLocalDateString(date = new Date()){
+  return [
+    date.getFullYear(),
+    String(date.getMonth() + 1).padStart(2, '0'),
+    String(date.getDate()).padStart(2, '0')
+  ].join('-');
 }
 
 function updateDateNavButtons(){
@@ -1047,136 +1049,143 @@ document.getElementById('entryForm').addEventListener('submit', e=>{
 });
 
 function renderAccountBalances(){
-  const el = document.getElementById('accountBalanceStrip');
-  const header = document.getElementById('entriesBalanceHeader');
+  const strip = $('accountBalanceStrip');
   const month = getMonth(currentMonthId);
-  const hasEntries = !!month && month.entries.length > 0;
-  if(header){
-    header.dataset.hasEntries = hasEntries ? 'true' : 'false';
-    header.style.display = hasEntries && document.getElementById('view-entries')?.classList.contains('active') ? 'block' : 'none';
-  }
-  if(!el || !month || !hasEntries) {
-    if(el) el.innerHTML = '';
+  const hasEntries = updateEntriesBalanceHeader();
+  if(!strip || !month || !hasEntries){
+    if(strip) strip.innerHTML = '';
     return;
   }
 
   const balances = computeBalancesUpTo(month.label);
-  el.innerHTML = `
+  strip.innerHTML = `
     <div class="account-balance-cards">
-      ${state.accounts.map(account=>{
-        const balance = balances[account.id] || 0;
-        return `
+      ${state.accounts.map(account => `
         <div class="account-balance-card">
           <div class="account-balance-name">${escapeHtml(account.name)}</div>
-          <div class="account-balance-value ${balance < 0 ? 'neg' : 'pos'}">${fmtMoney(balance)}</div>
-        </div>`;
-      }).join('')}
+          <div class="account-balance-value ${balances[account.id] < 0 ? 'neg' : 'pos'}">${fmtMoney(balances[account.id] || 0)}</div>
+        </div>`).join('')}
     </div>`;
+}
+
+function setEntriesEmpty(message, countText=''){
+  const empty = $('entriesEmpty');
+  const tbody = $('entryTableBody');
+  tbody.innerHTML = '';
+  empty.style.display = 'block';
+  empty.querySelector('p').textContent = message;
+  $('entryCount').textContent = countText;
+}
+
+function updateEntriesBalanceHeader(){
+  const header = $('entriesBalanceHeader');
+  const month = getMonth(currentMonthId);
+  const hasEntries = !!month && month.entries.length > 0;
+  if(header) header.dataset.hasEntries = String(hasEntries);
+  setDisplay(header, hasEntries && $('view-entries')?.classList.contains('active'));
+  return hasEntries;
+}
+
+function getFilteredAndSortedEntries(entries){
+  const filtered = entries.filter(entry => {
+    if(entryFilters.type !== 'all' && entry.type !== entryFilters.type) return false;
+    if(entryFilters.account !== 'all'){
+      const matchesAccount = entry.type === 'transfer'
+        ? entry.fromId === entryFilters.account || entry.toId === entryFilters.account
+        : entry.accountId === entryFilters.account;
+      if(!matchesAccount) return false;
+    }
+    if(entryFilters.tag !== 'all' && entry.tagId !== entryFilters.tag) return false;
+    return !entryFilters.search || (entry.comment || '').toLowerCase().includes(entryFilters.search);
+  });
+
+  const [sortField, sortDirection] = entrySort.split('-');
+  filtered.sort((a, b) => {
+    let comparison = 0;
+    if(sortField === 'added') comparison = (a.createdAt || 0) - (b.createdAt || 0);
+    else if(sortField === 'date') comparison = a.date.localeCompare(b.date);
+    else if(sortField === 'amount') comparison = a.amount - b.amount;
+    return sortDirection === 'asc' ? comparison : -comparison;
+  });
+  return filtered;
+}
+
+function getEntryAccountDisplay(entry){
+  if(entry.type === 'transfer'){
+    const from = getAccount(entry.fromId);
+    const to = getAccount(entry.toId);
+    return {
+      label: `${from ? from.name : '?'} → ${to ? to.name : '?'}`,
+      badgeClass: 'badge-transfer',
+      badgeText: 'Transfer'
+    };
+  }
+  const account = getAccount(entry.accountId);
+  return {
+    label: account ? account.name : '?',
+    badgeClass: entry.type === 'incoming' ? 'badge-in' : 'badge-out',
+    badgeText: entry.type === 'incoming' ? 'Incoming' : 'Outgoing'
+  };
+}
+
+function renderEntryRow(entry, index, sortedEntries){
+  const tag = getTag(entry.tagId);
+  const accountDisplay = getEntryAccountDisplay(entry);
+  const isDateSort = entrySort === 'date-desc' || entrySort === 'date-asc';
+  const isNewDateGroup = isDateSort && index > 0 && sortedEntries[index - 1].date !== entry.date;
+  const showDate = !isDateSort || index === 0 || isNewDateGroup;
+  const comment = entry.comment || '';
+
+  return `
+    <tr${isNewDateGroup ? ' class="date-group-start"' : ''}>
+      <td>${showDate ? fmtEntryDate(entry.date) : ''}</td>
+      <td><span class="badge ${accountDisplay.badgeClass}">${accountDisplay.badgeText}</span></td>
+      <td>${escapeHtml(accountDisplay.label)}</td>
+      <td>${tag ? `<span class="tag-pill">${escapeHtml(tag.name)}</span>` : ''}</td>
+      <td class="muted comment-cell" title="${escapeHtml(comment)}">${escapeHtml(comment)}</td>
+      <td class="num">${fmtMoney(entry.amount)}</td>
+      <td style="white-space:nowrap;">
+        <button class="icon-btn" data-edit="${entry.id}" title="Edit">✎</button>
+        <button class="icon-btn btn-danger" data-del="${entry.id}" title="Delete">✕</button>
+      </td>
+    </tr>`;
 }
 
 function renderEntryTable(){
   renderAccountBalances();
   const month = getMonth(currentMonthId);
-  const tbody = document.getElementById('entryTableBody');
-  if(!month || month.entries.length===0){
-    tbody.innerHTML='';
-    document.getElementById('entriesEmpty').style.display='block';
-    document.getElementById('entriesEmpty').querySelector('p').textContent = 'No entries in this month yet.';
-    document.getElementById('entryCount').textContent='';
+  if(!month || month.entries.length === 0){
+    setEntriesEmpty('No entries in this month yet.');
     saveState();
     return;
   }
 
-  let filtered = month.entries.filter(e=>{
-    if(entryFilters.type!=='all' && e.type!==entryFilters.type) return false;
-    if(entryFilters.account!=='all'){
-      const matchesAccount = e.type==='transfer'
-        ? (e.fromId===entryFilters.account || e.toId===entryFilters.account)
-        : e.accountId===entryFilters.account;
-      if(!matchesAccount) return false;
-    }
-    if(entryFilters.tag!=='all' && e.tagId!==entryFilters.tag) return false;
-    if(entryFilters.search && !(e.comment||'').toLowerCase().includes(entryFilters.search)) return false;
-    return true;
-  });
-
-  const [sortField, sortDir] = entrySort.split('-');
-  filtered.sort((a,b)=>{
-    if(sortField==='added'){
-      const cmp = (a.createdAt || 0) - (b.createdAt || 0);
-      return sortDir==='asc' ? cmp : -cmp;
-    }
-    let cmp = 0;
-    if(sortField==='date') cmp = a.date.localeCompare(b.date);
-    else if(sortField==='amount') cmp = a.amount - b.amount;
-    return sortDir==='asc' ? cmp : -cmp;
-  });
-
-  if(filtered.length===0){
-    tbody.innerHTML='';
-    document.getElementById('entriesEmpty').style.display='block';
-    document.getElementById('entriesEmpty').querySelector('p').textContent = 'No entries match the current filters.';
-    document.getElementById('entryCount').textContent = `0 of ${month.entries.length} entries`;
+  const sortedEntries = getFilteredAndSortedEntries(month.entries);
+  if(sortedEntries.length === 0){
+    setEntriesEmpty('No entries match the current filters.', `0 of ${month.entries.length} entries`);
     saveState();
     return;
   }
 
-  document.getElementById('entriesEmpty').style.display='none';
-  const sorted = filtered;
-  document.getElementById('entryCount').textContent = sorted.length===month.entries.length
-    ? `${sorted.length} entries`
-    : `${sorted.length} of ${month.entries.length} entries`;
+  $('entriesEmpty').style.display = 'none';
+  $('entryCount').textContent = sortedEntries.length === month.entries.length
+    ? `${sortedEntries.length} entries`
+    : `${sortedEntries.length} of ${month.entries.length} entries`;
+  $('entryTableBody').innerHTML = sortedEntries.map((entry, index) =>
+    renderEntryRow(entry, index, sortedEntries)
+  ).join('');
 
-  const isDateSort = entrySort === 'date-desc' || entrySort === 'date-asc';
-
-  tbody.innerHTML = sorted.map((e,idx)=>{
-    const tag = getTag(e.tagId);
-    let acctLabel;
-    let badgeClass, badgeText;
-    if(e.type==='transfer'){
-      const from = getAccount(e.fromId), to = getAccount(e.toId);
-      acctLabel = `${from?from.name:'?'} → ${to?to.name:'?'}`;
-      badgeClass='badge-transfer'; badgeText='Transfer';
-    } else {
-      const acc = getAccount(e.accountId);
-      acctLabel = acc ? acc.name : '?';
-      badgeClass = e.type==='incoming' ? 'badge-in' : 'badge-out';
-      badgeText = e.type==='incoming' ? 'Incoming' : 'Outgoing';
-    }
-    // Date grouping is enabled explicitly for both date sort directions.
-    // Compare the sorted rows themselves so filtering and either date direction
-    // always produce the correct group boundaries.
-    const isNewDateGroup = isDateSort && idx > 0 && sorted[idx - 1].date !== e.date;
-    const showDate = !isDateSort || idx === 0 || isNewDateGroup;
-    return `
-      <tr${isNewDateGroup ? ' class="date-group-start"' : ''}>
-        <td>${showDate ? fmtEntryDate(e.date) : ''}</td>
-        <td><span class="badge ${badgeClass}">${badgeText}</span></td>
-        <td>${escapeHtml(acctLabel)}</td>
-        <td>${tag?`<span class="tag-pill">${escapeHtml(tag.name)}</span>`:''}</td>
-        <td class="muted comment-cell" title="${escapeHtml(e.comment||'')}">${escapeHtml(e.comment||'')}</td>
-        <td class="num">${fmtMoney(e.amount)}</td>
-        <td style="white-space:nowrap;">
-          <button class="icon-btn" data-edit="${e.id}" title="Edit">✎</button>
-          <button class="icon-btn btn-danger" data-del="${e.id}" title="Delete">✕</button>
-        </td>
-      </tr>`;
-  }).join('');
-
-  tbody.querySelectorAll('[data-edit]').forEach(btn=>{
-    btn.addEventListener('click', ()=> loadEntryForEdit(btn.dataset.edit));
+  $$('[data-edit]').forEach(button => {
+    button.addEventListener('click', () => loadEntryForEdit(button.dataset.edit));
   });
-  tbody.querySelectorAll('[data-del]').forEach(btn=>{
-    btn.addEventListener('click', ()=>{
-      confirmModal('Delete entry?', 'This cannot be undone.', ()=>{
-        const month = getMonth(currentMonthId);
-        month.entries = month.entries.filter(e=>e.id!==btn.dataset.del);
-        renderEntryTable();
-        showToast('Entry deleted');
-      });
-    });
+  $$('[data-del]').forEach(button => {
+    button.addEventListener('click', () => confirmModal('Delete entry?', 'This cannot be undone.', () => {
+      const currentMonth = getMonth(currentMonthId);
+      currentMonth.entries = currentMonth.entries.filter(entry => entry.id !== button.dataset.del);
+      renderEntryTable();
+      showToast('Entry deleted');
+    }));
   });
-
   saveState();
 }
 
@@ -1395,8 +1404,6 @@ function renderDashboard(){
   saveState();
 }
 
-let dashboardSelectedMonth = null;
-
 function daysElapsedInMonth(ym){
   const [y,m] = ym.split('-').map(Number);
   const now = new Date();
@@ -1406,19 +1413,17 @@ function daysElapsedInMonth(ym){
 }
 
 function computeBalancesUpTo(monthLabel){
-  const balances = {};
-  state.accounts.forEach(a=> balances[a.id] = a.opening);
-  const relevantMonths = state.months.filter(m=>m.label<=monthLabel);
-  relevantMonths.forEach(m=>{
-    m.entries.forEach(e=>{
-      if(e.type==='incoming'){ balances[e.accountId] = (balances[e.accountId]||0) + e.amount; }
-      else if(e.type==='outgoing'){ balances[e.accountId] = (balances[e.accountId]||0) - e.amount; }
-      else if(e.type==='transfer'){
-        balances[e.fromId] = (balances[e.fromId]||0) - e.amount;
-        balances[e.toId] = (balances[e.toId]||0) + e.amount;
+  const balances = Object.fromEntries(state.accounts.map(account => [account.id, account.opening]));
+  state.months
+    .filter(month => month.label <= monthLabel)
+    .forEach(month => month.entries.forEach(entry => {
+      if(entry.type === 'incoming') balances[entry.accountId] = (balances[entry.accountId] || 0) + entry.amount;
+      else if(entry.type === 'outgoing') balances[entry.accountId] = (balances[entry.accountId] || 0) - entry.amount;
+      else if(entry.type === 'transfer'){
+        balances[entry.fromId] = (balances[entry.fromId] || 0) - entry.amount;
+        balances[entry.toId] = (balances[entry.toId] || 0) + entry.amount;
       }
-    });
-  });
+    }));
   return balances;
 }
 
@@ -1591,8 +1596,6 @@ document.getElementById('fileImport').addEventListener('change', (e)=>{
 });
 
 /* ============================= PERSISTENCE (LOCAL STORAGE AUTOSAVE) ============================= */
-
-const STORAGE_KEY = 'financeTrackerState_v1';
 
 function saveState(){
   try{
