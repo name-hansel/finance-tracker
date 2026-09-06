@@ -485,6 +485,7 @@
 const DEFAULT_TAGS = ["Food","Groceries","Rent","Transport","Shopping","Bills","Entertainment","Health","Salary","Cashback","Other"];
 const STORAGE_KEY = 'financeTrackerState_v1';
 const CURRENCY_STORAGE_KEY = 'financeTrackerCurrency_v1';
+const SORT_STORAGE_KEY = 'financeTrackerSort_v1';
 const DEFAULT_CURRENCY = '₹';
 const DEFAULT_ENTRY_SORT = 'added-desc';
 
@@ -584,6 +585,22 @@ function loadCurrencySymbol(){
     applyCurrencySymbol(localStorage.getItem(CURRENCY_STORAGE_KEY) || DEFAULT_CURRENCY);
   } catch(err){
     applyCurrencySymbol(DEFAULT_CURRENCY);
+  }
+}
+
+const VALID_ENTRY_SORTS = ['added-desc','date-desc','date-asc','amount-desc','amount-asc'];
+
+function applyEntrySort(sortValue){
+  entrySort = VALID_ENTRY_SORTS.includes(sortValue) ? sortValue : DEFAULT_ENTRY_SORT;
+  const selector = document.getElementById('sortEntries');
+  if(selector) selector.value = entrySort;
+}
+
+function loadEntrySort(){
+  try{
+    applyEntrySort(localStorage.getItem(SORT_STORAGE_KEY) || DEFAULT_ENTRY_SORT);
+  } catch(err){
+    applyEntrySort(DEFAULT_ENTRY_SORT);
   }
 }
 
@@ -730,11 +747,6 @@ document.getElementById('tagForm').addEventListener('submit', e=>{
 function renderEntriesView(){
   updateLastUpdated();
   setDisplay($('entriesBalanceHeader'), false);
-  // Keep the sort state in sync with the dropdown on initial render/reload.
-  // Browsers can restore the selected option visually after a reload, while
-  // the JavaScript variable has been reset to its default.
-  const sortSelect = document.getElementById('sortEntries');
-  if(sortSelect) entrySort = sortSelect.value;
 
   const sel = document.getElementById('monthSelector');
   const allMonths = [...state.months].sort((a,b)=> b.label.localeCompare(a.label));
@@ -889,7 +901,11 @@ document.getElementById('filterType').addEventListener('change', e=>{ entryFilte
 document.getElementById('filterAccount').addEventListener('change', e=>{ entryFilters.account = e.target.value; renderEntryTable(); });
 document.getElementById('filterTag').addEventListener('change', e=>{ entryFilters.tag = e.target.value; renderEntryTable(); });
 document.getElementById('filterSearch').addEventListener('input', e=>{ entryFilters.search = e.target.value.toLowerCase(); renderEntryTable(); });
-document.getElementById('sortEntries').addEventListener('change', e=>{ entrySort = e.target.value; renderEntryTable(); });
+document.getElementById('sortEntries').addEventListener('change', e=>{
+  entrySort = e.target.value;
+  try{ localStorage.setItem(SORT_STORAGE_KEY, entrySort); } catch(err){}
+  renderEntryTable();
+});
 
 document.getElementById('btnExpandEntries').addEventListener('click', ()=>{
   entriesFullscreen = !entriesFullscreen;
@@ -1528,6 +1544,7 @@ currencySelector.addEventListener('change', ()=>{
 });
 
 loadCurrencySymbol();
+loadEntrySort();
 
 document.getElementById('btnExport').addEventListener('click', ()=>{
   const data = JSON.stringify(state, null, 2);
