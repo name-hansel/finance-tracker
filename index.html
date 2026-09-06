@@ -1168,6 +1168,7 @@ function renderEntryRow(entry, index, sortedEntries){
 
 function renderEntryTable(){
   renderAccountBalances();
+  updateLastUpdated();
   const month = getMonth(currentMonthId);
   if(!month || month.entries.length === 0){
     setEntriesEmpty('No entries in this month yet.');
