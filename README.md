@@ -1,4 +1,4 @@
-# [Finance Tracker](https://name-hansel.github.io/finance-tracker/)
+# <a href="https://name-hansel.github.io/finance-tracker/" target="_blank">Finance Tracker</a>
 
 Track your Salary, Spending, and Credit Card accounts in one place — no more Excel sheets.
 
