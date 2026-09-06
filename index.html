@@ -23,7 +23,26 @@
     --radius:6px;
     --mono:ui-monospace,SFMono-Regular,"SF Mono",Consolas,"Liberation Mono",monospace;
     --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;
+    --inverse-bg:#1f2328;
+    --inverse-text:#ffffff;
   }
+  html[data-theme="dark"]{
+    --bg:#0d1117;
+    --panel:#161b22;
+    --border:#30363d;
+    --border-muted:#21262d;
+    --text:#e6edf3;
+    --text-muted:#8b949e;
+    --accent:#58a6ff;
+    --accent-bg:#0d2d4d;
+    --green:#3fb950;
+    --green-bg:#0d2818;
+    --red:#f85149;
+    --red-bg:#2d1214;
+    --yellow:#d29922;
+    --yellow-bg:#3b2f05;
+  }
+  body{transition:background-color .15s ease,color .15s ease;}
   *{box-sizing:border-box;}
   body{margin:0;font-family:var(--sans);background:var(--bg);color:var(--text);font-size:14px;line-height:1.5;}
   a{color:var(--accent);text-decoration:none;}
@@ -37,8 +56,8 @@
   header.topbar h1{font-size:16px;margin:0;font-weight:600;display:flex;align-items:center;gap:8px;}
   .last-updated{font-size:12px;color:var(--text-muted);margin-left:auto;margin-right:8px;white-space:nowrap;}
   header.topbar h1 .logo{
-    width:20px;height:20px;border-radius:4px;background:var(--text);
-    display:inline-flex;align-items:center;justify-content:center;color:#fff;font-size:12px;font-weight:700;
+    width:20px;height:20px;border-radius:4px;background:var(--inverse-bg);
+    display:inline-flex;align-items:center;justify-content:center;color:var(--inverse-text);font-size:12px;font-weight:700;
   }
   .topbar-actions{display:flex;gap:8px;}
 
@@ -75,14 +94,14 @@
   .info-icon:hover,.info-icon:focus{background:var(--text-muted);}
   .info-icon .info-tooltip{
     display:none;position:absolute;bottom:135%;left:50%;transform:translateX(-50%);
-    background:var(--text);color:#fff;padding:8px 10px;border-radius:var(--radius);
+    background:var(--inverse-bg);color:var(--inverse-text);padding:8px 10px;border-radius:var(--radius);
     font-size:12px;font-weight:400;line-height:1.4;width:240px;z-index:20;
     box-shadow:0 4px 12px rgba(0,0,0,.18);text-align:left;text-transform:none;letter-spacing:normal;
   }
   .info-icon:hover .info-tooltip,.info-icon:focus .info-tooltip{display:block;}
   .info-icon .info-tooltip::after{
     content:"";position:absolute;top:100%;left:50%;transform:translateX(-50%);
-    border:5px solid transparent;border-top-color:var(--text);
+    border:5px solid transparent;border-top-color:var(--inverse-bg);
   }
 
   .grid{display:grid;gap:16px;}
@@ -154,7 +173,7 @@
     padding:5px 12px;border-radius:2em;border:1px solid var(--border);background:var(--panel);
     cursor:pointer;font-size:13px;font-weight:500;
   }
-  .month-chip.active{background:var(--text);color:#fff;border-color:var(--text);}
+  .month-chip.active{background:var(--inverse-bg);color:var(--inverse-text);border-color:var(--inverse-bg);}
   .month-chip:hover:not(.active){background:var(--bg);}
   .month-chip .icon-btn:hover{opacity:1 !important;color:var(--red) !important;}
 
@@ -165,7 +184,7 @@
   .bar-value{width:110px;text-align:right;font-size:12px;font-family:var(--mono);flex-shrink:0;}
 
   .toast{
-    position:fixed;bottom:20px;right:20px;background:var(--text);color:#fff;
+    position:fixed;bottom:20px;right:20px;background:var(--inverse-bg);color:var(--inverse-text);
     padding:10px 16px;border-radius:var(--radius);font-size:13px;z-index:100;
     box-shadow:0 4px 12px rgba(0,0,0,.15);
   }
@@ -276,6 +295,7 @@
     </select>
     <button class="btn" id="btnExport">Export JSON</button>
     <button class="btn" id="btnImport">Import JSON</button>
+    <button class="btn" id="btnThemeToggle" title="Toggle dark mode" aria-label="Toggle dark mode">🌙 Dark</button>
     <input type="file" id="fileImport" accept="application/json" style="display:none;">
   </div>
 </header>
@@ -486,6 +506,7 @@ const DEFAULT_TAGS = ["Food","Groceries","Rent","Transport","Shopping","Bills","
 const STORAGE_KEY = 'financeTrackerState_v1';
 const CURRENCY_STORAGE_KEY = 'financeTrackerCurrency_v1';
 const SORT_STORAGE_KEY = 'financeTrackerSort_v1';
+const THEME_STORAGE_KEY = 'financeTrackerTheme_v1';
 const DEFAULT_CURRENCY = '₹';
 const DEFAULT_ENTRY_SORT = 'added-desc';
 
@@ -603,6 +624,26 @@ function loadEntrySort(){
     applyEntrySort(DEFAULT_ENTRY_SORT);
   }
 }
+
+function applyTheme(theme){
+  const isDark = theme === 'dark';
+  document.documentElement.setAttribute('data-theme', isDark ? 'dark' : 'light');
+  const btn = document.getElementById('btnThemeToggle');
+  if(btn) btn.textContent = isDark ? '☀️ Light' : '🌙 Dark';
+}
+
+function loadTheme(){
+  let saved = 'light';
+  try{ saved = localStorage.getItem(THEME_STORAGE_KEY) || 'light'; } catch(err){}
+  applyTheme(saved);
+}
+
+document.getElementById('btnThemeToggle').addEventListener('click', ()=>{
+  const current = document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';
+  const next = current === 'dark' ? 'light' : 'dark';
+  applyTheme(next);
+  try{ localStorage.setItem(THEME_STORAGE_KEY, next); } catch(err){}
+});
 
 function fmtMoney(amount){
   const sign = amount < 0 ? '-' : '';
@@ -1546,6 +1587,7 @@ currencySelector.addEventListener('change', ()=>{
 
 loadCurrencySymbol();
 loadEntrySort();
+loadTheme();
 
 document.getElementById('btnExport').addEventListener('click', ()=>{
   const data = JSON.stringify(state, null, 2);
