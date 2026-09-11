@@ -1062,6 +1062,7 @@ function resetEntryForm(keepValues=false){
   const account = keepValues ? document.getElementById('entryAccount').value : '';
   const from = keepValues ? document.getElementById('entryFrom').value : '';
   const to = keepValues ? document.getElementById('entryTo').value : '';
+  const tag = keepValues ? document.getElementById('entryTag').value : '';
 
   editingEntryId = null;
   document.getElementById('entryForm').reset();
@@ -1076,6 +1077,7 @@ function resetEntryForm(keepValues=false){
     } else {
       document.getElementById('entryAccount').value = account;
     }
+    if(tag) document.getElementById('entryTag').value = tag;
   }
 
   document.getElementById('entryFormTitle').textContent = 'Add Entry';
