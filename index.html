@@ -1010,6 +1010,13 @@ function applyFullscreenState(){
   }
 }
 
+document.addEventListener('keydown', (e)=>{
+  if(e.key === 'Escape' && entriesFullscreen){
+    entriesFullscreen = false;
+    applyFullscreenState();
+  }
+});
+
 function getLocalDateString(date = new Date()){
   return [
     date.getFullYear(),
