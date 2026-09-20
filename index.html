@@ -1435,13 +1435,7 @@ function renderDashboard(){
     <div class="grid grid-2">
       <div class="card">
         <h3>Top tags by spend${infoIcon('Groups all Outgoing entries for this month by tag, ranked by total amount. The percentage shown is that tag\'s share of your total outgoing this month.')}</h3>
-        ${topTags.length? topTags.map(t=>`
-          <div class="bar-row">
-            <div class="bar-label" title="${escapeHtml(t.tag?t.tag.name:'?')}">${escapeHtml(t.tag?t.tag.name:'?')}</div>
-            <div class="bar-track"><div class="bar-fill" style="width:${Math.max(t.pct,2)}%;"></div></div>
-            <div class="bar-value">${fmtMoney(t.amt)} (${t.pct.toFixed(1)}%)</div>
-          </div>
-        `).join('') : `<p class="muted">No outgoing entries this month.</p>`}
+        <div id="tagPieChart"></div>
       </div>
 
       <div class="card">
@@ -1507,6 +1501,9 @@ function renderDashboard(){
     btn.addEventListener('click', ()=>{ dashboardSelectedMonth = btn.dataset.dm; renderDashboard(); });
   });
 
+  if(!showMultiMonth){
+    drawTagPieChart('tagPieChart', topTags);
+  }
   if(showMultiMonth){
     drawTagTrendChart('tagTrendChart', lastTrendMonths.map(m=>m.label), topTrendTags, tagTrend);
     drawTrendChart('trendChart', trendMonths.map(m=>m.label), trendIn, trendOut, trendNet);
@@ -1539,6 +1536,58 @@ function computeBalancesUpTo(monthLabel){
 }
 
 /* ---- simple SVG charts, no libraries ---- */
+
+function drawTagPieChart(containerId, tags){
+  const el = document.getElementById(containerId);
+  if(!el) return;
+  if(!tags || tags.length===0){
+    el.innerHTML = '<p class="muted">No outgoing entries this month.</p>';
+    return;
+  }
+
+  const colors = ['#0969da','#cf222e','#1a7f37','#9a6700','#8250df','#bf3989','#1b7c83','#57606a'];
+  const size = 220, radius = 100, cx = size/2, cy = size/2;
+  const total = tags.reduce((sum,t)=>sum+t.amt,0);
+
+  let startAngle = -Math.PI/2;
+  let slices = '';
+  tags.forEach((t,i)=>{
+    const fraction = total>0 ? t.amt/total : 0;
+    const color = colors[i % colors.length];
+    const tagName = t.tag ? t.tag.name : '?';
+    const tooltip = `${escapeHtml(tagName)}: ${fmtMoney(t.amt)} (${t.pct.toFixed(1)}%)`;
+
+    if(fraction >= 0.9999){
+      slices += `<path d="M ${cx-radius} ${cy} A ${radius} ${radius} 0 1 1 ${cx+radius} ${cy} A ${radius} ${radius} 0 1 1 ${cx-radius} ${cy} Z" fill="${color}"><title>${tooltip}</title></path>`;
+    } else if(fraction > 0){
+      const angle = fraction * Math.PI * 2;
+      const endAngle = startAngle + angle;
+      const x1 = cx + radius*Math.cos(startAngle);
+      const y1 = cy + radius*Math.sin(startAngle);
+      const x2 = cx + radius*Math.cos(endAngle);
+      const y2 = cy + radius*Math.sin(endAngle);
+      const largeArc = angle > Math.PI ? 1 : 0;
+      slices += `<path d="M ${cx} ${cy} L ${x1.toFixed(2)} ${y1.toFixed(2)} A ${radius} ${radius} 0 ${largeArc} 1 ${x2.toFixed(2)} ${y2.toFixed(2)} Z" fill="${color}" stroke="var(--panel)" stroke-width="1"><title>${tooltip}</title></path>`;
+      startAngle = endAngle;
+    }
+  });
+
+  const legend = tags.map((t,i)=>{
+    const tagName = t.tag ? t.tag.name : '?';
+    return `
+      <div style="display:flex;align-items:center;gap:6px;font-size:12px;margin-bottom:6px;">
+        <span style="width:10px;height:10px;border-radius:2px;background:${colors[i % colors.length]};display:inline-block;flex-shrink:0;"></span>
+        <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${escapeHtml(tagName)}">${escapeHtml(tagName)}</span>
+        <span class="muted" style="font-family:var(--mono);flex-shrink:0;">${fmtMoney(t.amt)} (${t.pct.toFixed(1)}%)</span>
+      </div>`;
+  }).join('');
+
+  el.innerHTML = `
+    <div style="display:flex;gap:20px;align-items:center;flex-wrap:wrap;">
+      <svg viewBox="0 0 ${size} ${size}" style="width:180px;height:180px;flex-shrink:0;">${slices}</svg>
+      <div style="flex:1;min-width:160px;">${legend}</div>
+    </div>`;
+}
 
 function drawTagTrendChart(containerId, months, tags, tagTrend){
   const el = document.getElementById(containerId);
