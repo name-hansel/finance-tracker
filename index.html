@@ -60,6 +60,20 @@
     display:inline-flex;align-items:center;justify-content:center;color:var(--inverse-text);font-size:12px;font-weight:700;
   }
   .topbar-actions{display:flex;gap:8px;}
+  .export-action{position:relative;display:inline-flex;}
+  .export-reminder-dot{
+    position:absolute;top:-6px;right:-6px;width:13px;height:13px;border-radius:50%;
+    background:var(--red);border:2px solid var(--panel);display:none;pointer-events:auto;
+    cursor:help;box-sizing:border-box;
+  }
+  .export-reminder-dot::after{
+    content:attr(data-tooltip);position:absolute;right:-2px;top:calc(100% + 8px);
+    background:var(--text);color:var(--panel);font-size:11px;font-weight:500;
+    line-height:1.3;padding:6px 8px;border-radius:5px;white-space:nowrap;
+    opacity:0;visibility:hidden;transform:translateY(-2px);transition:opacity .15s ease,transform .15s ease;
+    z-index:20;pointer-events:none;box-shadow:0 2px 8px rgba(0,0,0,.15);
+  }
+  .export-reminder-dot:hover::after{opacity:1;visibility:visible;transform:translateY(0);}
 
   nav.tabs{
     display:flex;align-items:center;gap:2px;background:var(--panel);border-bottom:1px solid var(--border);
@@ -298,7 +312,10 @@
       <option value="C$">C$ Canadian Dollar (CAD)</option>
       <option value="CHF">CHF Swiss Franc</option>
     </select>
-    <button class="btn" id="btnExport">Export JSON</button>
+    <span class="export-action">
+      <button class="btn" id="btnExport">Export JSON</button>
+      <span class="export-reminder-dot" id="exportReminderDot" aria-label="JSON export reminder" title="Your JSON export is due" data-tooltip="Your JSON export is due"></span>
+    </span>
     <button class="btn" id="btnImport">Import JSON</button>
     <button class="btn" id="btnThemeToggle" title="Toggle dark mode" aria-label="Toggle dark mode">🌙 Dark</button>
     <input type="file" id="fileImport" accept="application/json" style="display:none;">
@@ -496,6 +513,21 @@
           <button class="btn btn-primary" type="submit">+ Add Tag</button>
         </form>
       </div>
+
+      <div class="card">
+        <h2>Settings</h2>
+        <div class="field">
+          <label for="exportReminderFrequency">JSON export reminder</label>
+          <select id="exportReminderFrequency">
+            <option value="daily">Daily</option>
+            <option value="weekly">Weekly</option>
+            <option value="fortnightly">Fortnightly</option>
+            <option value="monthly">Monthly</option>
+            <option value="never" selected>Never</option>
+          </select>
+          <p class="hint">Show a reminder dot on Export JSON when an export is due.</p>
+        </div>
+      </div>
     </div>
   </section>
 
@@ -512,6 +544,10 @@ const STORAGE_KEY = 'financeTrackerState_v1';
 const CURRENCY_STORAGE_KEY = 'financeTrackerCurrency_v1';
 const SORT_STORAGE_KEY = 'financeTrackerSort_v1';
 const THEME_STORAGE_KEY = 'financeTrackerTheme_v1';
+const EXPORT_REMINDER_FREQUENCY_KEY = 'financeTrackerExportReminderFrequency_v1';
+const LAST_EXPORT_KEY = 'financeTrackerLastExport_v1';
+const DEFAULT_EXPORT_REMINDER_FREQUENCY = 'never';
+const EXPORT_REMINDER_DAYS = { daily: 1, weekly: 7, fortnightly: 14, monthly: 30, never: null };
 const DEFAULT_CURRENCY = '₹';
 const DEFAULT_ENTRY_SORT = 'added-desc';
 
@@ -697,6 +733,45 @@ function fmtMonthShort(yearMonth){
   return new Date(Number(year), Number(month) - 1, 1).toLocaleString('en-US', {month:'short'}) + " '" + year.slice(2);
 }
 
+function getExportReminderFrequency(){
+  try{
+    const value = localStorage.getItem(EXPORT_REMINDER_FREQUENCY_KEY);
+    return Object.prototype.hasOwnProperty.call(EXPORT_REMINDER_DAYS, value) ? value : DEFAULT_EXPORT_REMINDER_FREQUENCY;
+  } catch(err){
+    return DEFAULT_EXPORT_REMINDER_FREQUENCY;
+  }
+}
+
+function setExportReminderFrequency(value){
+  const frequency = Object.prototype.hasOwnProperty.call(EXPORT_REMINDER_DAYS, value) ? value : DEFAULT_EXPORT_REMINDER_FREQUENCY;
+  try{ localStorage.setItem(EXPORT_REMINDER_FREQUENCY_KEY, frequency); } catch(err){}
+  const dot = $('exportReminderDot');
+  if(dot) dot.style.display = frequency === 'never' ? 'none' : '';
+  updateExportReminder();
+}
+
+function isExportReminderDue(){
+  let lastExport;
+  try{ lastExport = localStorage.getItem(LAST_EXPORT_KEY); } catch(err){}
+  if(!lastExport) return true;
+  const lastExportTime = new Date(lastExport).getTime();
+  if(!Number.isFinite(lastExportTime)) return true;
+  const frequency = getExportReminderFrequency();
+  if(frequency === 'never') return false;
+  const interval = EXPORT_REMINDER_DAYS[frequency] * 24 * 60 * 60 * 1000;
+  return Date.now() - lastExportTime >= interval;
+}
+
+function updateExportReminder(){
+  const dot = $('exportReminderDot');
+  if(!dot) return;
+  const due = isExportReminderDue();
+  dot.style.display = due ? 'block' : 'none';
+  const hint = due ? 'Your JSON export is due' : 'JSON export is up to date';
+  dot.title = hint;
+  dot.dataset.tooltip = hint;
+}
+
 function updateLastUpdated(){
   const element = $('lastUpdated');
   if(!element) return;
@@ -729,6 +804,8 @@ function fmtEntryDate(dateString){
 
 function renderMasterData(){
   updateLastUpdated();
+  const exportReminderFrequency = document.getElementById('exportReminderFrequency');
+  if(exportReminderFrequency) exportReminderFrequency.value = getExportReminderFrequency();
   const accBody = document.getElementById('accountsTableBody');
   accBody.innerHTML = state.accounts.map(a=>`
     <tr>
@@ -815,6 +892,13 @@ document.getElementById('tagForm').addEventListener('submit', e=>{
   document.getElementById('tagForm').reset();
   renderMasterData();
   showToast('Tag added');
+});
+
+const exportReminderFrequency = document.getElementById('exportReminderFrequency');
+exportReminderFrequency.addEventListener('change', ()=>{
+  setExportReminderFrequency(exportReminderFrequency.value);
+  updateExportReminder();
+  showToast('Export reminder updated');
 });
 
 /* ============================= ENTRIES VIEW ============================= */
@@ -1691,6 +1775,7 @@ currencySelector.addEventListener('change', ()=>{
 loadCurrencySymbol();
 loadEntrySort();
 loadTheme();
+updateExportReminder();
 
 document.getElementById('btnExport').addEventListener('click', ()=>{
   const data = JSON.stringify(state, null, 2);
@@ -1702,6 +1787,8 @@ document.getElementById('btnExport').addEventListener('click', ()=>{
   a.download = `finance-tracker-export-${dateStr}.json`;
   a.click();
   URL.revokeObjectURL(url);
+  try{ localStorage.setItem(LAST_EXPORT_KEY, new Date().toISOString()); } catch(err){}
+  updateExportReminder();
   showToast('Exported');
 });
 
@@ -1792,6 +1879,7 @@ resetEntryForm();
 renderMasterData();
 renderEntriesView();
 renderDashboard();
+updateExportReminder();
 
 </script>
 </body>
