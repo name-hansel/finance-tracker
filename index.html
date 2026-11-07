@@ -213,6 +213,17 @@
   .modal{background:var(--panel);border-radius:var(--radius);border:1px solid var(--border);padding:20px;max-width:420px;width:90%;}
   .modal h3{margin-top:0;}
   .modal-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:16px;}
+  .modal.welcome-modal{max-width:520px;}
+  .welcome-modal h3{font-size:18px;margin:0 0 4px 0;}
+  .welcome-modal .welcome-sub{margin:0 0 16px 0;font-size:13px;}
+  .welcome-steps{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:12px;}
+  .welcome-steps li{display:flex;gap:12px;align-items:flex-start;font-size:13px;line-height:1.45;}
+  .welcome-steps .step-num{
+    flex-shrink:0;width:22px;height:22px;border-radius:50%;background:var(--inverse-bg);color:var(--inverse-text);
+    display:inline-flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;margin-top:1px;
+  }
+  .welcome-steps strong{color:var(--text);}
+  .welcome-note{margin:16px 0 0 0;padding:10px 12px;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg);font-size:12px;color:var(--text-muted);}
 
   .muted{color:var(--text-muted);}
   .flex-between{display:flex;justify-content:space-between;align-items:center;}
@@ -318,6 +329,7 @@
     </span>
     <button class="btn" id="btnImport">Import JSON</button>
     <button class="btn" id="btnThemeToggle" title="Toggle dark mode" aria-label="Toggle dark mode">🌙 Dark</button>
+    <button class="btn" id="btnHelp" title="Show getting-started guide" aria-label="Show getting-started guide">?</button>
     <input type="file" id="fileImport" accept="application/json" style="display:none;">
   </div>
 </header>
@@ -550,6 +562,7 @@ const DEFAULT_EXPORT_REMINDER_FREQUENCY = 'never';
 const EXPORT_REMINDER_DAYS = { daily: 1, weekly: 7, fortnightly: 14, monthly: 30, never: null };
 const DEFAULT_CURRENCY = '₹';
 const DEFAULT_ENTRY_SORT = 'added-desc';
+const WELCOME_SEEN_KEY = 'financeTrackerWelcomeSeen_v1';
 
 const $ = id => document.getElementById(id);
 const $$ = selector => document.querySelectorAll(selector);
@@ -651,6 +664,46 @@ function confirmModal(title, body, onConfirm){
 function escapeHtml(s){
   return String(s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
+
+function markWelcomeSeen(){
+  try{ localStorage.setItem(WELCOME_SEEN_KEY, '1'); } catch(err){}
+}
+
+function hasSeenWelcome(){
+  try{ return localStorage.getItem(WELCOME_SEEN_KEY) === '1'; } catch(err){ return false; }
+}
+
+function closeWelcomeModal(){
+  const root = $('modalRoot');
+  if(root.querySelector('.welcome-modal')) root.innerHTML = '';
+  markWelcomeSeen();
+}
+
+function showWelcomeModal(){
+  $('modalRoot').innerHTML = `
+    <div class="modal-backdrop">
+      <div class="modal welcome-modal" role="dialog" aria-modal="true" aria-labelledby="welcomeTitle">
+        <h3 id="welcomeTitle">Welcome to Finance Tracker</h3>
+        <p class="muted welcome-sub">Get set up in four quick steps:</p>
+        <ol class="welcome-steps">
+          <li><span class="step-num">1</span><div><strong>Set opening balances.</strong> Go to <em>Master Data → Accounts</em> and enter what each account currently holds (for a credit card, enter what you owe as a negative number). Balances and runway are calculated from these.</div></li>
+          <li><span class="step-num">2</span><div><strong>Adjust your tags.</strong> Still in <em>Master Data</em>, add or remove spending categories so they match how you track money.</div></li>
+          <li><span class="step-num">3</span><div><strong>Create a month sheet.</strong> Open the <em>Entries</em> tab and click <em>+ New Month</em>. Each month gets its own sheet.</div></li>
+          <li><span class="step-num">4</span><div><strong>Add entries.</strong> Log incoming money, outgoing spends, or transfers between your accounts. Then check the <em>Dashboard</em> for insights.</div></li>
+        </ol>
+        <p class="welcome-note">Your data never leaves this browser, so use <strong>Export JSON</strong> regularly to keep a backup. You can reopen this guide anytime with the <strong>?</strong> button at the top.</p>
+        <div class="modal-actions">
+          <button class="btn btn-primary" id="welcomeGotIt">Got it, let's start</button>
+        </div>
+      </div>
+    </div>`;
+  $('welcomeGotIt').onclick = closeWelcomeModal;
+  $('welcomeGotIt').focus();
+}
+
+document.addEventListener('keydown', e=>{
+  if(e.key === 'Escape' && document.querySelector('.welcome-modal')) closeWelcomeModal();
+});
 
 function infoIcon(text){
   return `<span class="info-icon" tabindex="0" role="img" aria-label="Info">i<span class="info-tooltip">${escapeHtml(text)}</span></span>`;
@@ -1880,6 +1933,15 @@ renderMasterData();
 renderEntriesView();
 renderDashboard();
 updateExportReminder();
+
+document.getElementById('btnHelp').addEventListener('click', showWelcomeModal);
+
+// First visit only. Anyone who already has entries saved is an existing user, so skip them.
+// (Master data alone doesn't count: the app autosaves its default accounts/tags on first load.)
+if(!hasSeenWelcome()){
+  if(restored && getEntries().length > 0) markWelcomeSeen();
+  else showWelcomeModal();
+}
 
 </script>
 </body>
